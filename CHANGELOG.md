@@ -1,5 +1,8 @@
-## 0.2.0
+## 0.2.1
+* Fixed Dependency Issue
 
+## 0.2.0
+§
 * Add `WelkAppBar` with ComicStrip, Sticker, Bubble, and Split layouts,
   floating card appearance, string/custom titles, logo positioning, up to three
   actions, and theme-aware styling.

@@ -1,6 +1,6 @@
 name: welkui_flutter
 description: "Comic-inspired Flutter widgets for Android and iOS, with crisp outlines, hard shadows, bundled typography, and accessible mobile interactions."
-version: 0.2.0
+version: 0.2.1
 repository: https://github.com/welkdock/welkUI-flutter
 
 platforms:

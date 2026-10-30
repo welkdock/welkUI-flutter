@@ -14,5 +14,6 @@ coverage/
 *.iws
 pubspec.lock
 **/doc/api/
-assets/images/
 assets/licenses/
+assets/images/*
+!assets/images/welkui-logo.png
