@@ -244,6 +244,7 @@ class _DialogSurface extends StatelessWidget {
           fontSize: 16,
           height: 1.5,
           color: theme.ink,
+          decoration: TextDecoration.none,
         ),
         child: CustomPaint(
           painter: WelkHardShadowPainter(
@@ -264,6 +265,7 @@ class _DialogSurface extends StatelessWidget {
                   fontSize: 16,
                   height: 1.5,
                   color: theme.ink,
+                  decoration: TextDecoration.none,
                 ),
                 child: child,
               ),

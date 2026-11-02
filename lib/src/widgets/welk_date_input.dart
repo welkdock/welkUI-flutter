@@ -5,6 +5,7 @@ import 'welk_date_picker.dart';
 /// A controlled date field with a styled, dismissible mobile calendar dialog.
 ///
 /// The calendar fits all seven Monday-to-Sunday columns to the dialog width.
+/// Tap its heading to choose a year and month without stepping month by month.
 /// The calendar button opens the popup; typing never unexpectedly opens a
 /// dialog. Invalid or out-of-range text is not emitted. Null [onChanged]
 /// disables both the editor and the popup action.
