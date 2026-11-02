@@ -1,3 +1,7 @@
+## 0.2.2
+* Fixed DatePicker and DateInput to have a Year and month selector
+* Removed default underline from Dialogs
+
 ## 0.2.1
 * Fixed Dependency Issue
 
