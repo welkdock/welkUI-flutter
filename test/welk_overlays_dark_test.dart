@@ -49,6 +49,42 @@ void expectSurface(WidgetTester tester, Finder root, WelkColors colors) {
 }
 
 void main() {
+  testWidgets('dialog text has no inherited underline by default', (
+    tester,
+  ) async {
+    late BuildContext launcher;
+    await tester.pumpWidget(
+      host(
+        Builder(
+          builder: (context) {
+            launcher = context;
+            return const SizedBox.shrink();
+          },
+        ),
+      ),
+    );
+    final closed = showWelkDialog<void>(
+      context: launcher,
+      builder: (context) => const DefaultTextStyle(
+        style: TextStyle(decoration: TextDecoration.underline),
+        child: WelkDialog(
+          title: Text('Dialog title'),
+          child: Text('Dialog body'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    for (final text in ['Dialog title', 'Dialog body', 'Okay']) {
+      final richText = tester.widget<RichText>(
+        find.descendant(of: find.text(text), matching: find.byType(RichText)),
+      );
+      expect(richText.text.style?.decoration, TextDecoration.none);
+    }
+    Navigator.of(tester.element(find.byType(WelkDialog))).pop();
+    await tester.pumpAndSettle();
+    await closed;
+  });
+
   for (final snack in [false, true]) {
     for (final override in <bool?>[null, false, true]) {
       testWidgets(

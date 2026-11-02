@@ -375,6 +375,189 @@ void main() {
     );
   });
 
+  for (final popup in [false, true]) {
+    for (final direction in TextDirection.values) {
+      testWidgets(
+        '${popup ? 'popup' : 'inline'} calendar jumps to 2001 in $direction',
+        (tester) async {
+          DateTime? selected = DateTime(2026, 10, 22);
+          var changes = 0;
+          await tester.pumpWidget(
+            host(
+              StatefulBuilder(
+                builder: (context, setState) {
+                  void select(DateTime? date) => setState(() {
+                    selected = date;
+                    changes++;
+                  });
+                  return popup
+                      ? WelkDateInput(
+                          label: 'Date',
+                          value: selected,
+                          onChanged: select,
+                        )
+                      : WelkDatePicker(
+                          label: 'Date',
+                          value: selected,
+                          onChanged: select,
+                        );
+                },
+              ),
+              width: 320,
+              textScale: 2,
+              direction: direction,
+            ),
+          );
+          if (popup) {
+            await tester.tap(action('Open calendar'));
+            await tester.pumpAndSettle();
+          }
+          await tester.tap(action('Choose month and year'));
+          await tester.pumpAndSettle();
+          final years = find.descendant(
+            of: find.byKey(const ValueKey('calendar-years')),
+            matching: find.byType(Scrollable),
+          );
+          expect(find.byKey(const ValueKey('year-2026')), findsOneWidget);
+          final year = find.byKey(const ValueKey('year-2001'));
+          await tester.scrollUntilVisible(year, -180, scrollable: years);
+          await tester.pumpAndSettle();
+          await tester.tap(year);
+          await tester.pumpAndSettle();
+          final month = find.byKey(const ValueKey('month-2001-2'));
+          await tester.ensureVisible(month);
+          await tester.tap(month);
+          await tester.pumpAndSettle();
+          expect(find.text('February 2001'), findsOneWidget);
+          expect(selected, DateTime(2026, 10, 22));
+          expect(changes, 0);
+          final day = find.byKey(const ValueKey('date-2001-02-14'));
+          await tester.ensureVisible(day);
+          await tester.tap(day);
+          await tester.pumpAndSettle();
+          expect(selected, DateTime(2001, 2, 14));
+          expect(changes, 1);
+          if (popup) expect(find.byType(PickerCalendar), findsNothing);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
+  testWidgets('year and month selection respect date bounds', (tester) async {
+    await tester.pumpWidget(
+      host(
+        WelkDatePicker(
+          label: 'Date',
+          value: DateTime(2002, 10, 22),
+          minDate: DateTime(2001, 6, 15),
+          maxDate: DateTime(2003, 2, 3),
+          onChanged: (_) {},
+        ),
+      ),
+    );
+    await tester.tap(action('Choose month and year'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('year-2000')), findsNothing);
+    expect(find.byKey(const ValueKey('year-2004')), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('year-2001')));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<PickerButton>(find.byKey(const ValueKey('month-2001-5')))
+          .onPressed,
+      isNull,
+    );
+    await tester.tap(find.byKey(const ValueKey('month-2001-6')));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<PickerButton>(find.byKey(const ValueKey('date-2001-06-14')))
+          .onPressed,
+      isNull,
+    );
+    expect(
+      tester
+          .widget<PickerButton>(find.byKey(const ValueKey('date-2001-06-15')))
+          .onPressed,
+      isNotNull,
+    );
+    await tester.tap(action('Choose month and year'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('year-2003')));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<PickerButton>(find.byKey(const ValueKey('month-2003-3')))
+          .onPressed,
+      isNull,
+    );
+    await tester.tap(find.byKey(const ValueKey('month-2003-2')));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<PickerButton>(find.byKey(const ValueKey('date-2003-02-04')))
+          .onPressed,
+      isNull,
+    );
+  });
+
+  testWidgets('disabled calendar cannot open year and month selection', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      host(WelkDatePicker(label: 'Date', value: DateTime(2026, 10, 22))),
+    );
+    expect(
+      tester.widget<PickerButton>(action('Choose month and year')).onPressed,
+      isNull,
+    );
+  });
+
+  testWidgets('calendar resets selectors when controlled bounds change', (
+    tester,
+  ) async {
+    late StateSetter update;
+    DateTime? minDate;
+    var changes = 0;
+    await tester.pumpWidget(
+      host(
+        StatefulBuilder(
+          builder: (context, setState) {
+            update = setState;
+            return WelkDatePicker(
+              label: 'Date',
+              value: null,
+              initialDisplayDate: DateTime(2026, 10),
+              minDate: minDate,
+              onChanged: (_) => changes++,
+            );
+          },
+        ),
+      ),
+    );
+    for (final year in [2027, 2028]) {
+      await tester.tap(action('Choose month and year'));
+      await tester.pumpAndSettle();
+      if (year == 2028) {
+        await tester.tap(find.byKey(const ValueKey('year-2027')));
+        await tester.pumpAndSettle();
+      }
+      update(() => minDate = DateTime(year, 6, 15));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('calendar-years')), findsNothing);
+      expect(find.text('June $year'), findsOneWidget);
+      expect(action('Choose month and year'), findsOneWidget);
+    }
+    await tester.tap(action('Choose month and year'));
+    await tester.pumpAndSettle();
+    await tester.tap(action('Show calendar'));
+    await tester.pumpAndSettle();
+    expect(find.text('June 2028'), findsOneWidget);
+    expect(changes, 0);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('picker actions do not add invisible keyboard traversal stops', (
     tester,
   ) async {

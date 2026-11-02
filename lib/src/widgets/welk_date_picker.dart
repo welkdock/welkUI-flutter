@@ -11,6 +11,7 @@ import 'welk_picker_internal.dart';
 /// adapt to available width, retaining at least 48 logical pixels of height.
 /// Dates are local civil dates; time and UTC offsets are ignored. Invalid or
 /// out-of-range edits remain visible but are not sent to [onChanged].
+/// Tap the calendar heading to choose a year, then a month, before picking a day.
 /// A null [onChanged] disables editing and selection.
 class WelkDatePicker extends StatelessWidget {
   const WelkDatePicker({
@@ -373,8 +374,11 @@ class PickerCalendar extends StatefulWidget {
   State<PickerCalendar> createState() => _PickerCalendarState();
 }
 
+enum _CalendarView { days, years, months }
+
 class _PickerCalendarState extends State<PickerCalendar> {
   late DateTime _month;
+  _CalendarView _view = _CalendarView.days;
   final _dayFocus = List.generate(31, (_) => FocusNode());
 
   DateTime _bounded(DateTime date) {
@@ -414,6 +418,7 @@ class _PickerCalendarState extends State<PickerCalendar> {
         pickerFormatDate(widget.initialDisplayDate) !=
             pickerFormatDate(oldWidget.initialDisplayDate)) {
       _month = _initialMonth();
+      _view = _CalendarView.days;
     }
   }
 
@@ -476,11 +481,13 @@ class _PickerCalendarState extends State<PickerCalendar> {
     final next = DateTime(_month.year, _month.month + 1);
     final previousEnd = DateTime(_month.year, _month.month, 0);
     final previousEnabled =
+        _view == _CalendarView.days &&
         widget.onChanged != null &&
         previous.year >= 1 &&
         (widget.minDate == null ||
             !previousEnd.isBefore(pickerDateOnly(widget.minDate!)));
     final nextEnabled =
+        _view == _CalendarView.days &&
         widget.onChanged != null &&
         next.year <= 9999 &&
         (widget.maxDate == null ||
@@ -518,12 +525,26 @@ class _PickerCalendarState extends State<PickerCalendar> {
               Expanded(
                 child: Semantics(
                   liveRegion: true,
-                  child: Text(
-                    localizations.formatMonthYear(_month),
-                    textAlign: TextAlign.center,
-                    style: pickerTextStyle(context).copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: theme.onFill(theme.accent),
+                  child: PickerButton(
+                    label: _view == _CalendarView.days
+                        ? 'Choose month and year'
+                        : 'Show calendar',
+                    outlined: false,
+                    minimumSize: const Size(0, 48),
+                    onPressed: widget.onChanged == null
+                        ? null
+                        : () => setState(() {
+                            _view = _view == _CalendarView.days
+                                ? _CalendarView.years
+                                : _CalendarView.days;
+                          }),
+                    child: Text(
+                      localizations.formatMonthYear(_month),
+                      textAlign: TextAlign.center,
+                      style: pickerTextStyle(context).copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: theme.onFill(theme.accent),
+                      ),
                     ),
                   ),
                 ),
@@ -546,69 +567,127 @@ class _PickerCalendarState extends State<PickerCalendar> {
           ),
         ),
         const SizedBox(height: 12),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final width = constraints.maxWidth;
-            final dayHeight =
-                MediaQuery.textScalerOf(context).scale(13.6) * 1.5 + 28;
-            return Column(
-              children: [
+        if (_view == _CalendarView.years)
+          _PickerCalendarYears(
+            firstYear: widget.minDate?.year ?? 1,
+            lastYear: widget.maxDate?.year ?? 9999,
+            year: _month.year,
+            onChanged: widget.onChanged == null
+                ? null
+                : (year) => setState(() {
+                    final date = _bounded(DateTime(year, _month.month));
+                    _month = DateTime(date.year, date.month);
+                    _view = _CalendarView.months;
+                  }),
+          )
+        else if (_view == _CalendarView.months)
+          Column(
+            children: [
+              for (var row = 0; row < 6; row++)
                 Row(
                   children: [
-                    for (final day in const [
-                      'Mon',
-                      'Tue',
-                      'Wed',
-                      'Thu',
-                      'Fri',
-                      'Sat',
-                      'Sun',
-                    ])
+                    for (var col = 0; col < 2; col++)
                       Expanded(
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 5),
-                          child: Semantics(
-                            label: day,
-                            child: ExcludeSemantics(
-                              child: FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Text(
-                                  day,
-                                  textAlign: TextAlign.center,
-                                  style: pickerTextStyle(context, size: 11.2),
+                          padding: const EdgeInsets.all(4),
+                          child: _monthButton(row * 2 + col + 1, localizations),
+                        ),
+                      ),
+                  ],
+                ),
+            ],
+          )
+        else
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth;
+              final dayHeight =
+                  MediaQuery.textScalerOf(context).scale(13.6) * 1.5 + 28;
+              return Column(
+                children: [
+                  Row(
+                    children: [
+                      for (final day in const [
+                        'Mon',
+                        'Tue',
+                        'Wed',
+                        'Thu',
+                        'Fri',
+                        'Sat',
+                        'Sun',
+                      ])
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 5),
+                            child: Semantics(
+                              label: day,
+                              child: ExcludeSemantics(
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    day,
+                                    textAlign: TextAlign.center,
+                                    style: pickerTextStyle(context, size: 11.2),
+                                  ),
                                 ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                  ],
-                ),
-                for (var row = 0; row < rows; row++)
-                  Row(
-                    children: [
-                      for (var col = 0; col < 7; col++)
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.all(1.6),
-                            child: _day(
-                              row * 7 + col - offset + 1,
-                              count,
-                              today,
-                              selected,
-                              localizations,
-                              width / 7 - 3.2,
-                              dayHeight,
-                            ),
-                          ),
-                        ),
                     ],
                   ),
-              ],
-            );
-          },
-        ),
+                  for (var row = 0; row < rows; row++)
+                    Row(
+                      children: [
+                        for (var col = 0; col < 7; col++)
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.all(1.6),
+                              child: _day(
+                                row * 7 + col - offset + 1,
+                                count,
+                                today,
+                                selected,
+                                localizations,
+                                width / 7 - 3.2,
+                                dayHeight,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                ],
+              );
+            },
+          ),
       ],
+    );
+  }
+
+  Widget _monthButton(int month, MaterialLocalizations localizations) {
+    final date = DateTime(_month.year, month);
+    final lastDay = DateTime(_month.year, month + 1, 0);
+    final enabled =
+        widget.onChanged != null &&
+        (widget.minDate == null ||
+            !lastDay.isBefore(pickerDateOnly(widget.minDate!))) &&
+        (widget.maxDate == null ||
+            !date.isAfter(pickerDateOnly(widget.maxDate!)));
+    final label = localizations.formatMonthYear(date);
+    return PickerButton(
+      key: ValueKey('month-${date.year}-$month'),
+      label: label,
+      selected: month == _month.month,
+      onPressed: enabled
+          ? () => setState(() {
+              _month = date;
+              _view = _CalendarView.days;
+            })
+          : null,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(label, style: pickerTextStyle(context)),
+      ),
     );
   }
 
@@ -644,6 +723,88 @@ class _PickerCalendarState extends State<PickerCalendar> {
           style: const TextStyle(fontSize: 13.6, height: 1.5).copyWith(
             fontWeight: iso == selected ? FontWeight.w700 : FontWeight.normal,
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PickerCalendarYears extends StatefulWidget {
+  const _PickerCalendarYears({
+    required this.firstYear,
+    required this.lastYear,
+    required this.year,
+    required this.onChanged,
+  });
+
+  final int firstYear;
+  final int lastYear;
+  final int year;
+  final ValueChanged<int>? onChanged;
+
+  @override
+  State<_PickerCalendarYears> createState() => _PickerCalendarYearsState();
+}
+
+class _PickerCalendarYearsState extends State<_PickerCalendarYears> {
+  ScrollController? _controller;
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final rowHeight = MediaQuery.textScalerOf(context).scale(13.6) * 1.5 + 36;
+    final rows = ((widget.lastYear - widget.firstYear + 1) / 3).ceil();
+    const visibleRows = 5;
+    final initialRow = ((widget.year - widget.firstYear) ~/ 3 - 2).clamp(
+      0,
+      rows > visibleRows ? rows - visibleRows : 0,
+    );
+    _controller ??= ScrollController(
+      initialScrollOffset: initialRow * rowHeight,
+    );
+    final localizations = MaterialLocalizations.of(context);
+    return SizedBox(
+      height: rowHeight * visibleRows,
+      child: ListView.builder(
+        key: const ValueKey('calendar-years'),
+        controller: _controller,
+        primary: false,
+        padding: EdgeInsets.zero,
+        itemExtent: rowHeight,
+        itemCount: rows,
+        itemBuilder: (context, row) => Row(
+          children: [
+            for (var col = 0; col < 3; col++)
+              Expanded(
+                child: Builder(
+                  builder: (context) {
+                    final year = widget.firstYear + row * 3 + col;
+                    if (year > widget.lastYear) return const SizedBox.shrink();
+                    final label = localizations.formatYear(DateTime(year));
+                    return Padding(
+                      padding: const EdgeInsets.all(4),
+                      child: PickerButton(
+                        key: ValueKey('year-$year'),
+                        label: label,
+                        selected: year == widget.year,
+                        onPressed: widget.onChanged == null
+                            ? null
+                            : () => widget.onChanged!(year),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(label, style: pickerTextStyle(context)),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+          ],
         ),
       ),
     );
